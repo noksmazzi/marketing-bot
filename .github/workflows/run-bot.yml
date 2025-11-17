@@ -1,0 +1,35 @@
+name: Run Marketing Bot
+
+on:
+  schedule:
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Run the bot
+      env:
+        TIKTOK_USER: ${{ secrets.TIKTOK_USER }}
+        TIKTOK_PASS: ${{ secrets.TIKTOK_PASS }}
+        PINTEREST_USER: ${{ secrets.PINTEREST_USER }}
+        PINTEREST_PASS: ${{ secrets.PINTEREST_PASS }}
+        PINTEREST_BOARD: ${{ secrets.PINTEREST_BOARD }}
+        HEADLESS: "true"
+      run: node index.js
