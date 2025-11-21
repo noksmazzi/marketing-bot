@@ -1,111 +1,76 @@
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const cron = require('node-cron');
+// ---------------------------------------------------------
+// ✅ POLYFILLS (Fix: "File is not defined", TikTok upload errors)
+// ---------------------------------------------------------
+const fetchPkg = require("node-fetch");
+const { Blob, File, FormData } = fetchPkg;
 
-const fetchNewImages = require('./gumroad_fetcher.js');
-const { createPhotoVideo } = require('./generator.js');
-const uploadToTikTok = require('./uploader/tiktok.js');
-const uploadToPinterest = require('./uploader/pinterest.js');
+globalThis.fetch = (...args) => fetchPkg(...args);
+globalThis.Blob = Blob;
+globalThis.File = File;
+globalThis.FormData = FormData;
 
-const IMAGES_DIR = process.env.IMAGES_DIR || './images';
-const MUSIC_DIR = process.env.MUSIC_DIR || './music';
-const OUT_DIR = process.env.OUT_DIR || './tmp';
+// ---------------------------------------------------------
+// Load environment variables
+// ---------------------------------------------------------
+require("dotenv").config();
 
-if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+// ---------------------------------------------------------
+// Dependencies
+// ---------------------------------------------------------
+const cron = require("node-cron");
+const { fetchNewImages } = require("./gumroad_fetcher");
+const { createPhotoVideo } = require("./generator");
+const uploadToPinterest = require("./uploader/pinterest");
+const uploadToTikTok = require("./uploader/tiktok");
 
-// Track posted images
-const postedFile = path.join(OUT_DIR, 'posted.json');
-let posted = { images: [] };
-
-if (fs.existsSync(postedFile)) {
-  try {
-    posted = JSON.parse(fs.readFileSync(postedFile));
-  } catch {
-    posted = { images: [] };
-  }
-}
-
-function pickUnpostedImages(n = 6) {
-  const files = fs.readdirSync(IMAGES_DIR)
-    .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
-
-  const unposted = files.filter(f => !posted.images.includes(f));
-  return unposted.slice(0, n).map(f => path.join(IMAGES_DIR, f));
-}
-
-function pickMusic() {
-  if (!fs.existsSync(MUSIC_DIR)) return null;
-  const files = fs.readdirSync(MUSIC_DIR)
-    .filter(f => /\.(mp3|m4a|wav)$/i.test(f));
-  return files.length ? path.join(MUSIC_DIR, files[0]) : null;
-}
-
-function markAsPosted(imagePaths) {
-  const names = imagePaths.map(p => path.basename(p));
-  posted.images = [...new Set([...posted.images, ...names])];
-  fs.writeFileSync(postedFile, JSON.stringify(posted, null, 2));
-}
-
-async function createAndPostOnce() {
-  console.log('=== START createAndPostOnce ===', new Date().toISOString());
+// ---------------------------------------------------------
+// MAIN BOT FUNCTION
+// ---------------------------------------------------------
+async function runBot() {
+  console.log("🚀 Bot starting...");
 
   try {
-    const downloaded = await fetchNewImages();
-    if (downloaded.length) console.log('Downloaded from Gumroad:', downloaded);
+    // 1️⃣ Fetch new Gumroad images
+    console.log("📥 Fetching Gumroad images...");
+    const images = await fetchNewImages();
 
-    const images = pickUnpostedImages(6);
-    if (images.length === 0) {
-      console.log('No new images to post.');
+    if (!images || images.length === 0) {
+      console.log("⚠️ No new images found.");
       return;
     }
 
-    console.log('Images used:', images);
+    const latest = images[0];
+    console.log("✔️ Found:", latest.url);
 
-    const music = pickMusic();
-    const caption = `New wallpaper drop! #wallpaper #Aesthetic ${new Date().toLocaleString('en-ZA')}`;
+    // 2️⃣ Create a TikTok video
+    console.log("🎬 Generating video...");
+    const videoPath = await createPhotoVideo(latest.url);
+    console.log("✔️ Video ready:", videoPath);
 
-    const video = await createPhotoVideo({
-      images,
-      musicPath: music,
-      outDir: OUT_DIR
-    });
+    // 3️⃣ Upload to Pinterest
+    console.log("📌 Uploading to Pinterest...");
+    await uploadToPinterest(latest.url, latest.title);
+    console.log("✔️ Posted on Pinterest");
 
-    console.log('Created video:', video);
-
-    try {
-      await uploadToTikTok({
-        videoFile: video,
-        caption
-      });
-    } catch (e) {
-      console.log('TikTok upload error:', e.message);
-    }
-
-    try {
-      await uploadToPinterest({
-        boardUrl: process.env.PINTEREST_BOARD,
-        imagePath: images[0],
-        title: 'New Wallpaper Pack',
-        description: caption
-      });
-    } catch (e) {
-      console.log('Pinterest upload error:', e.message);
-    }
-
-    markAsPosted(images);
-
-    console.log('=== DONE createAndPostOnce ===');
+    // 4️⃣ Upload to TikTok
+    console.log("🎵 Uploading to TikTok...");
+    await uploadToTikTok(videoPath, latest.title);
+    console.log("✔️ Posted on TikTok");
 
   } catch (err) {
-    console.error('ERROR IN createAndPostOnce:', err);
+    console.error("❌ BOT ERROR:", err);
   }
 }
 
-// Default schedule: daily at 10:00
-const cronExpr = process.env.SCHEDULE_CRON || '0 10 * * *';
-console.log('Scheduler set:', cronExpr);
+// ---------------------------------------------------------
+// Run immediately when GitHub Action triggers
+// ---------------------------------------------------------
+runBot();
 
-cron.schedule(cronExpr, createAndPostOnce);
-
-createAndPostOnce();
+// ---------------------------------------------------------
+// Cron schedule (every 30 minutes)
+// ---------------------------------------------------------
+cron.schedule("*/30 * * * *", () => {
+  console.log("⏳ Scheduled run triggered...");
+  runBot();
+});
