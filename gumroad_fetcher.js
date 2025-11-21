@@ -12,7 +12,9 @@ if (!fs.existsSync(IMAGES_DIR)) {
   fs.mkdirSync(IMAGES_DIR, { recursive: true });
 }
 
-// Download file from URL
+// ----------------------------
+// DOWNLOAD FILE
+// ----------------------------
 async function downloadFile(url, destPath) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Download failed: ${res.status}`);
@@ -24,90 +26,48 @@ async function downloadFile(url, destPath) {
   });
 }
 
-// Get existing local images
+// ----------------------------
+// LOCAL IMAGES
+// ----------------------------
 function listLocalImages() {
   return new Set(
     fs.readdirSync(IMAGES_DIR).filter(f => /\.(jpe?g|png|webp)$/i.test(f))
   );
 }
 
-// ---- GUMROAD API FETCH ----
-async function fetchFromGumroadAPI() {
-  const token = process.env.GUMROAD_ACCESS_TOKEN;
-  const permalink = process.env.GUMROAD_PERMALINK;
+// ----------------------------
+// SCRAPE A SINGLE URL
+// ----------------------------
+async function scrapeSingleProduct(url) {
+  console.log(`🔍 Scraping: ${url}`);
 
-  if (!token || !permalink) {
-    throw new Error('Gumroad API credentials missing');
-  }
-
-  const apiURL = `https://api.gumroad.com/v2/products/${encodeURIComponent(permalink)}`;
-  const res = await fetch(apiURL, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  if (!res.ok) throw new Error(`Gumroad API error: ${res.status}`);
-
-  const data = await res.json();
-  if (!data.product) throw new Error('Invalid Gumroad API response');
-
-  const files = data.product.files || data.product.attachments || [];
-  const local = listLocalImages();
-  const downloaded = [];
-
-  for (const file of files) {
-    const url = file.download_url || file.url || file.file_url;
-    if (!url) continue;
-
-    const ext = path.extname(new URL(url).pathname) || '.jpg';
-    const filename = (file.name || uuidv4()) + ext;
-
-    if (local.has(filename)) continue;
-
-    const dest = path.join(IMAGES_DIR, filename);
-    try {
-      await downloadFile(url, dest);
-      downloaded.push(dest);
-      console.log('Downloaded (API):', dest);
-    } catch (e) {
-      console.log('Failed to download file:', url, e.message);
-    }
-  }
-
-  return downloaded;
-}
-
-// ---- SCRAPE PUBLIC PRODUCT PAGE ----
-async function fetchFromGumroadScrape() {
-  const productUrl = process.env.GUMROAD_PRODUCT_URL;
-  if (!productUrl) throw new Error('GUMROAD_PRODUCT_URL missing');
-
-  const res = await fetch(productUrl);
-  if (!res.ok) throw new Error('Failed to load product page.');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load product page: ${url}`);
 
   const html = await res.text();
   const $ = cheerio.load(html);
 
   const urls = new Set();
 
-  // Scrape <img> tags
+  // IMG tags
   $('img').each((i, el) => {
     const src = $(el).attr('src') || $(el).attr('data-src');
     if (src && /\.(jpe?g|png|webp)$/i.test(src)) {
       if (src.startsWith('//')) urls.add('https:' + src);
       else if (src.startsWith('/')) {
-        const base = new URL(productUrl);
+        const base = new URL(url);
         urls.add(base.origin + src);
       } else urls.add(src);
     }
   });
 
-  // Scrape <a> download links
+  // Downloadable <a> links
   $('a').each((i, el) => {
     const href = $(el).attr('href');
     if (href && /\.(jpe?g|png|webp)$/i.test(href)) {
       if (href.startsWith('//')) urls.add('https:' + href);
       else if (href.startsWith('/')) {
-        const base = new URL(productUrl);
+        const base = new URL(url);
         urls.add(base.origin + href);
       } else urls.add(href);
     }
@@ -116,47 +76,52 @@ async function fetchFromGumroadScrape() {
   const local = listLocalImages();
   const downloaded = [];
 
-  for (const url of urls) {
+  for (const imgUrl of urls) {
     try {
-      const ext = path.extname(new URL(url).pathname) || '.jpg';
+      const ext = path.extname(new URL(imgUrl).pathname) || '.jpg';
       const filename = uuidv4() + ext;
 
       if (local.has(filename)) continue;
 
       const dest = path.join(IMAGES_DIR, filename);
-      await downloadFile(url, dest);
+      await downloadFile(imgUrl, dest);
 
       downloaded.push(dest);
-      console.log('Downloaded (SCRAPE):', dest);
+      console.log('✔ Downloaded:', dest);
 
     } catch (e) {
-      console.log('Failed to scrape download:', url, e.message);
+      console.log('❌ Failed:', imgUrl, e.message);
     }
   }
 
   return downloaded;
 }
 
-// ---- MAIN EXPORT ----
+// ----------------------------
+// MAIN EXPORT — MULTI URL
+// ----------------------------
 async function fetchNewImages() {
-  const method = (process.env.GUMROAD_METHOD || 'API').toUpperCase();
+  // NEW: Read all URLs
+  const list = process.env.GUMROAD_PRODUCT_URLS;
 
-  try {
-    if (method === 'API') {
-      return await fetchFromGumroadAPI();
-    } else {
-      return await fetchFromGumroadScrape();
-    }
-  } catch (err) {
-    console.log('Primary method failed:', err.message);
-    console.log('Trying SCRAPE fallback...');
+  if (!list) {
+    console.log("❌ No GUMROAD_PRODUCT_URLS found in secrets.");
+    return [];
+  }
+
+  const urls = list.split(",").map(u => u.trim()).filter(Boolean);
+  let allImages = [];
+
+  for (const url of urls) {
     try {
-      return await fetchFromGumroadScrape();
-    } catch (e2) {
-      console.log('Scrape fallback failed too:', e2.message);
-      return [];
+      const newImgs = await scrapeSingleProduct(url);
+      allImages.push(...newImgs);
+    } catch (err) {
+      console.log(`❌ Failed scraping ${url}:`, err.message);
     }
   }
+
+  return allImages;
 }
 
 module.exports = { fetchNewImages };
