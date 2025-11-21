@@ -2,12 +2,13 @@ name: Run Marketing Bot
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes (change if you want)
+    - cron: "*/30 * * * *"   # every 30 minutes
   workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -25,4 +26,5 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GUMROAD_API_KEY: ${{ secrets.GUMROAD_API_KEY }}
           PINTEREST_TOKEN: ${{ secrets.PINTEREST_TOKEN }}
+          TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}   # <-- added
         run: node index.js
