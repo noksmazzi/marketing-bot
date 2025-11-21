@@ -1,5 +1,5 @@
 // ---------------------------------------------------------
-// ✅ POLYFILLS (Fix: "File is not defined", TikTok upload errors)
+// ✅ POLYFILLS (Fix: "File is not defined", FormData issues)
 // ---------------------------------------------------------
 const fetchPkg = require("node-fetch");
 const { Blob, File, FormData } = fetchPkg;
@@ -30,8 +30,8 @@ async function runBot() {
   console.log("🚀 Bot starting...");
 
   try {
-    // 1️⃣ Fetch new Gumroad images
-    console.log("📥 Fetching Gumroad images...");
+    // 1️⃣ Fetch new Gumroad images (from ALL products)
+    console.log("📥 Fetching Gumroad images from ALL products...");
     const images = await fetchNewImages();
 
     if (!images || images.length === 0) {
@@ -40,21 +40,21 @@ async function runBot() {
     }
 
     const latest = images[0];
-    console.log("✔️ Found:", latest.url);
+    console.log("✔️ Found new image:", latest);
 
-    // 2️⃣ Create a TikTok video
+    // 2️⃣ Create TikTok video
     console.log("🎬 Generating video...");
-    const videoPath = await createPhotoVideo(latest.url);
+    const videoPath = await createPhotoVideo(latest);
     console.log("✔️ Video ready:", videoPath);
 
     // 3️⃣ Upload to Pinterest
     console.log("📌 Uploading to Pinterest...");
-    await uploadToPinterest(latest.url, latest.title);
+    await uploadToPinterest(latest, "New aesthetic wallpaper");
     console.log("✔️ Posted on Pinterest");
 
     // 4️⃣ Upload to TikTok
     console.log("🎵 Uploading to TikTok...");
-    await uploadToTikTok(videoPath, latest.title);
+    await uploadToTikTok(videoPath, "Aesthetic wallpaper 💫");
     console.log("✔️ Posted on TikTok");
 
   } catch (err) {
