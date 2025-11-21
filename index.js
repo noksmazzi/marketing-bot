@@ -98,15 +98,6 @@ async function createAndPostOnce() {
           boardUrl: process.env.PINTEREST_BOARD,
           imagePath: images[0],
           title: 'New Wallpaper Pack',
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const cron = require('cron').CronJob;
-
-const { fetchNewImages } = require('./gumroad_fetcher.js');
-const { createPhotoVideo } = require('./generator.js');
-const { uploadToTikTok } = require('./uploader/tiktok.js');
-const { uploadToPinterest } = require('./uploader/pinterest.js');
 
 const IMAGES_DIR = process.env.IMAGES_DIR || './images';
 const MUSIC_DIR = process.env.MUSIC_DIR || './music';
