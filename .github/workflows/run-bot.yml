@@ -25,6 +25,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GUMROAD_API_KEY: ${{ secrets.GUMROAD_API_KEY }}
+          GUMROAD_PRODUCT_URLS: ${{ secrets.GUMROAD_PRODUCT_URLS }}   # ✅ FIXED – added!
           PINTEREST_TOKEN: ${{ secrets.PINTEREST_TOKEN }}
-          TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}   # <-- added
+          TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}
         run: node index.js
