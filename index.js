@@ -1,4 +1,4 @@
-// index.js
+
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -52,7 +52,7 @@ async function createAndPostOnce() {
   console.log('=== START createAndPostOnce ===', new Date().toISOString());
 
   try {
-    // 1) Fetch new images
+    // 1) Fetch new images from Gumroad
     const downloaded = await fetchNewImages();
     if (downloaded.length) {
       console.log('Downloaded from Gumroad:', downloaded);
@@ -60,7 +60,7 @@ async function createAndPostOnce() {
       console.log('No new Gumroad images.');
     }
 
-    // 2) Select images
+    // 2) Pick images
     const images = pickUnpostedImages(6);
     if (images.length === 0) {
       console.log('No new images to post.');
@@ -69,7 +69,7 @@ async function createAndPostOnce() {
 
     console.log('Images used:', images);
 
-    // 3) Create video
+    // 3) Create video collage
     const music = pickMusic();
     const caption = `New wallpaper drop! #wallpaper #Aesthetic ${new Date().toLocaleString('en-ZA')}`;
 
@@ -81,20 +81,18 @@ async function createAndPostOnce() {
 
     console.log('Created video:', video);
 
-    // 4) Post to TikTok
+    // 4) Upload to TikTok (COOKIE LOGIN ONLY)
     try {
       await uploadToTikTok({
         videoFile: video,
         caption,
-        username: process.env.TIKTOK_USER,
-        password: process.env.TIKTOK_PASS,
         headless: process.env.HEADLESS === 'true'
       });
     } catch (e) {
       console.log('TikTok upload error:', e.message);
     }
 
-    // 5) Post to Pinterest
+    // 5) Upload to Pinterest (if configured)
     if (process.env.PINTEREST_USER) {
       try {
         await uploadToPinterest({
@@ -110,7 +108,7 @@ async function createAndPostOnce() {
       }
     }
 
-    // 6) Mark used images
+    // 6) Mark images as posted
     markAsPosted(images);
 
     console.log('=== DONE createAndPostOnce ===');
@@ -120,10 +118,11 @@ async function createAndPostOnce() {
   }
 }
 
-// SCHEDULE: Default daily at 10:00
+// DEFAULT SCHEDULE (10:00 daily)
 const cronExpr = process.env.SCHEDULE_CRON || '0 10 * * *';
 console.log('Scheduler set:', cronExpr);
 
+// Cron job
 const job = new cron(
   cronExpr,
   createAndPostOnce,
@@ -132,6 +131,8 @@ const job = new cron(
   'Africa/Johannesburg'
 );
 
+// Run immediately + schedule future runs
 createAndPostOnce();
 job.start();
+
 
