@@ -1,22 +1,10 @@
-{
-  "name": "marketing-bot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.13.2",
-    "dotenv": "^17.2.3",
-    "node-cron": "^3.0.3",
-    "pinterest-api": "^1.0.0",
-    "fluent-ffmpeg": "^2.1.2",
-    "playwright": "^1.42.0",
-    "canvas": "^2.11.2"
-  }
+"dependencies": {
+  "axios": "^1.13.2",
+  "dotenv": "^17.2.3",
+  "node-cron": "^3.0.2",
+  "pinterest-api": "^1.0.0",
+  "fluent-ffmpeg": "^2.1.2",
+  "playwright": "^1.42.0",
+  "canvas": "^2.11.2",
+  "cheerio": "^1.0.0-rc.12"
 }
