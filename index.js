@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const cron = require("cron").CronJob;
 
-const { fetchNewImages } = require("./gumroad_fetcher");
+const { fetchNewImages } = require('./gumroad_fetcher.js');
 const { createPhotoVideo } = require("./generator");
 const { uploadToTikTok } = require("./uploader/tiktok");
 const { uploadToPinterest } = require("./uploader/pinterest");
