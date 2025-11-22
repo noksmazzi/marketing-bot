@@ -1,56 +1,69 @@
 const fetch = require("node-fetch");
 
+// Extract JSON embedded in Gumroad product page
 async function fetchNewImages(productUrl) {
     try {
         console.log("🔍 Raw productUrl received:", productUrl);
 
         if (Array.isArray(productUrl)) productUrl = productUrl[0];
-
         if (!productUrl || typeof productUrl !== "string") {
             throw new Error("Invalid productUrl");
         }
 
-        // Extract product slug
-        const slugMatch = productUrl.match(/\/l\/([^\/\?]+)/);
-        if (!slugMatch) throw new Error("Could not extract product slug from URL");
+        // Remove tracking parameters
+        const cleanUrl = productUrl.split("?")[0];
 
-        const productId = slugMatch[1];
-        console.log("🔗 Product ID:", productId);
+        console.log("🌍 Fetching product HTML:", cleanUrl);
 
-        // Official Gumroad API
-        const apiUrl = `https://api.gumroad.com/v2/products/${productId}`;
-
-        console.log("📡 Fetching Gumroad API:", apiUrl);
-
-        const res = await fetch(apiUrl, {
-            headers: {
-                "Authorization": `Bearer ${process.env.GUMROAD_API_KEY}`,
-                "Accept": "application/json"
-            }
+        const res = await fetch(cleanUrl, {
+            headers: { "User-Agent": "Mozilla/5.0" }
         });
 
         if (!res.ok) {
-            throw new Error(`API fetch failed: ${res.status}`);
+            throw new Error(`Failed to load Gumroad page: ${res.status}`);
         }
 
-        const data = await res.json();
-        console.log("📦 Gumroad API keys:", Object.keys(data));
+        const html = await res.text();
+
+        // Look for the JSON embedded in the page
+        const jsonMatch = html.match(
+            /<script type="application\/json" id="product-json">([\s\S]*?)<\/script>/
+        );
+
+        if (!jsonMatch) {
+            throw new Error("Could not find product JSON in page");
+        }
+
+        const jsonData = JSON.parse(jsonMatch[1]);
+
+        console.log("📦 Product JSON keys:", Object.keys(jsonData));
 
         let images = [];
 
-        // Gumroad API returns product object inside "product"
-        const p = data.product;
+        // Main cover image
+        if (jsonData.preview_url) {
+            images.push(jsonData.preview_url);
+        }
 
-        if (p.preview_url) images.push(p.preview_url);
-
-        if (Array.isArray(p.previews)) {
+        // Gallery inside content_preview_files
+        if (Array.isArray(jsonData.content_preview_files)) {
             images.push(
-                ...p.previews
+                ...jsonData.content_preview_files
+                    .map(f => f.preview_url || f.large_url || f.url)
+                    .filter(Boolean)
+            );
+        }
+
+        // Marketing images, if any
+        if (Array.isArray(jsonData.marketing_images)) {
+            images.push(
+                ...jsonData.marketing_images
                     .map(img => img.large_url || img.url)
                     .filter(Boolean)
             );
         }
 
+        // Remove duplicates
         images = [...new Set(images)];
 
         console.log(`📸 Extracted ${images.length} images`);
