@@ -2,7 +2,7 @@ name: Run Marketing Bot
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # every 30 minutes
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -21,22 +21,24 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # ⭐ FFmpeg is required for video generation
+      # ⭐ Install FFmpeg (required for video)
       - name: Install FFmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
+      # ⭐ Install Playwright browsers (required for Pinterest & TikTok)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
       - name: Run the bot
         env:
           GUMROAD_PRODUCT_URLS: ${{ secrets.GUMROAD_PRODUCT_URLS }}
-          
-          # ⭐ Correct Pinterest secrets
+
           PINTEREST_EMAIL: ${{ secrets.PINTEREST_EMAIL }}
           PINTEREST_PASSWORD: ${{ secrets.PINTEREST_PASSWORD }}
           PINTEREST_BOARD_URL: ${{ secrets.PINTEREST_BOARD_URL }}
 
-          # ⭐ TikTok cookie login
           TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}
 
         run: node index.js
