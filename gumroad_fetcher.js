@@ -1,6 +1,5 @@
 const fetch = require("node-fetch");
 
-// Extract JSON embedded in Gumroad product page
 async function fetchNewImages(productUrl) {
     try {
         console.log("🔍 Raw productUrl received:", productUrl);
@@ -10,7 +9,6 @@ async function fetchNewImages(productUrl) {
             throw new Error("Invalid productUrl");
         }
 
-        // Remove tracking parameters
         const cleanUrl = productUrl.split("?")[0];
 
         console.log("🌍 Fetching product HTML:", cleanUrl);
@@ -25,43 +23,27 @@ async function fetchNewImages(productUrl) {
 
         const html = await res.text();
 
-        // Look for the JSON embedded in the page
-        const jsonMatch = html.match(
-            /<script type="application\/json" id="product-json">([\s\S]*?)<\/script>/
-        );
-
-        if (!jsonMatch) {
-            throw new Error("Could not find product JSON in page");
-        }
-
-        const jsonData = JSON.parse(jsonMatch[1]);
-
-        console.log("📦 Product JSON keys:", Object.keys(jsonData));
-
         let images = [];
 
-        // Main cover image
-        if (jsonData.preview_url) {
-            images.push(jsonData.preview_url);
+        // -------------------------------------
+        // 1️⃣ Extract main product image (preview)
+        // -------------------------------------
+        const ogMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
+        if (ogMatch) {
+            images.push(ogMatch[1]);
         }
 
-        // Gallery inside content_preview_files
-        if (Array.isArray(jsonData.content_preview_files)) {
-            images.push(
-                ...jsonData.content_preview_files
-                    .map(f => f.preview_url || f.large_url || f.url)
-                    .filter(Boolean)
+        // -------------------------------------
+        // 2️⃣ Extract gallery images
+        // -------------------------------------
+        const galleryMatches = [...html.matchAll(/<img[^>]+src="([^"]+)"[^>]*>/g)]
+            .map(m => m[1])
+            .filter(src => 
+                src.includes("gumroad") && 
+                (src.endsWith(".jpg") || src.endsWith(".jpeg") || src.endsWith(".png"))
             );
-        }
 
-        // Marketing images, if any
-        if (Array.isArray(jsonData.marketing_images)) {
-            images.push(
-                ...jsonData.marketing_images
-                    .map(img => img.large_url || img.url)
-                    .filter(Boolean)
-            );
-        }
+        images.push(...galleryMatches);
 
         // Remove duplicates
         images = [...new Set(images)];
