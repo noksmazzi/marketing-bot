@@ -12,6 +12,10 @@ globalThis.FormData = FormData;
 // Load environment variables
 require("dotenv").config();
 
+const fs = require("fs");
+const path = require("path");
+const fetch = require("node-fetch");
+
 // Dependencies
 const cron = require("node-cron");
 const { fetchNewImages } = require("./gumroad_fetcher");
@@ -20,22 +24,37 @@ const uploadToPinterest = require("./uploader/pinterest");
 const uploadToTikTok = require("./uploader/tiktok");
 
 // ---------------------------------------------------------
+// 📥 Download image helper
+// ---------------------------------------------------------
+async function downloadImage(url) {
+  console.log("📥 Downloading image:", url);
+  const res = await fetch(url);
+
+  if (!res.ok) {
+    throw new Error(`Failed to download image: ${res.status}`);
+  }
+
+  const buffer = await res.buffer();
+  const filePath = path.join(__dirname, "temp_image.jpg");
+  fs.writeFileSync(filePath, buffer);
+
+  console.log("📁 Image saved to:", filePath);
+  return filePath;
+}
+
+// ---------------------------------------------------------
 // MAIN BOT FUNCTION
 // ---------------------------------------------------------
 async function runBot() {
   console.log("🚀 Bot starting...");
 
   try {
-    // ---------------------------------------
-    // 🔗 READ GUMROAD URL(S) FROM SECRET
-    // ---------------------------------------
     let productUrls = process.env.GUMROAD_PRODUCT_URLS;
 
     if (!productUrls) {
       throw new Error("GUMROAD_PRODUCT_URLS is missing or empty!");
     }
 
-    // If it's stored as a comma-separated string
     if (typeof productUrls === "string" && productUrls.includes(",")) {
       productUrls = productUrls.split(",").map(u => u.trim());
     } else {
@@ -44,10 +63,8 @@ async function runBot() {
 
     console.log("📦 Using product URL:", productUrls[0]);
 
-    // ---------------------------------------------------------
-    // 1️⃣ Fetch new Gumroad images
-    // ---------------------------------------------------------
-    console.log("📥 Fetching Gumroad images from ALL products...");
+    // 1️⃣ Fetch Gumroad images
+    console.log("📥 Fetching Gumroad images...");
     const images = await fetchNewImages(productUrls[0]);
 
     if (!images || images.length === 0) {
@@ -58,17 +75,25 @@ async function runBot() {
     const latest = images[0];
     console.log("✔️ Found new image:", latest);
 
-    // 2️⃣ Create TikTok-style video
+    // 2️⃣ Download image locally
+    const localImagePath = await downloadImage(latest);
+
+    // 3️⃣ Create TikTok-style video (the correct usage)
     console.log("🎬 Generating video...");
-    const videoPath = await createPhotoVideo(latest);
+    const videoPath = await createPhotoVideo({
+      images: [localImagePath],   // MUST be an array!!
+      musicPath: null,            // or path to audio
+      outDir: "./tmp"
+    });
+
     console.log("✔️ Video ready:", videoPath);
 
-    // 3️⃣ Upload to Pinterest
+    // 4️⃣ Upload to Pinterest
     console.log("📌 Uploading to Pinterest...");
-    await uploadToPinterest(latest, "New aesthetic wallpaper");
+    await uploadToPinterest(localImagePath, "New aesthetic wallpaper");
     console.log("✔️ Posted on Pinterest");
 
-    // 4️⃣ Upload to TikTok
+    // 5️⃣ Upload to TikTok
     console.log("🎵 Uploading to TikTok...");
     await uploadToTikTok(videoPath, "Aesthetic wallpaper 💫");
     console.log("✔️ Posted on TikTok");
@@ -78,14 +103,10 @@ async function runBot() {
   }
 }
 
-// ---------------------------------------------------------
 // Run immediately
-// ---------------------------------------------------------
 runBot();
 
-// ---------------------------------------------------------
 // Cron: every 30 minutes
-// ---------------------------------------------------------
 cron.schedule("*/30 * * * *", () => {
   console.log("⏳ Scheduled run triggered...");
   runBot();
