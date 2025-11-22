@@ -17,9 +17,7 @@ async function fetchNewImages(productUrl) {
         // Remove tracking params
         const cleanUrl = productUrl.split("?")[0];
 
-        // Extract product slug (ID) from Gumroad URL
-        // Example:
-        // https://thewandacreates.gumroad.com/l/ofawui → "ofawui"
+        // Extract product slug (ID)
         const slugMatch = cleanUrl.match(/\/l\/([^\/\?]+)/);
         if (!slugMatch) {
             throw new Error("Could not extract product slug from URL");
@@ -28,9 +26,10 @@ async function fetchNewImages(productUrl) {
         const productId = slugMatch[1];
         console.log("🔗 Product ID:", productId);
 
-        // Correct API URL
-        const apiUrl = `https://gumroad.com/discover/api/products/${productId}`;
-        console.log("📡 Fetching Gumroad API:", apiUrl);
+        // NEW WORKING GUMROAD ENDPOINT
+        // Works for ALL products, even unlisted ones
+        const apiUrl = `${cleanUrl}?format=json`;
+        console.log("📡 Fetching Gumroad JSON:", apiUrl);
 
         const res = await fetch(apiUrl, {
             headers: {
@@ -44,19 +43,23 @@ async function fetchNewImages(productUrl) {
         }
 
         const data = await res.json();
-        console.log("📦 Gumroad API response keys:", Object.keys(data));
+        console.log("📦 Gumroad product keys:", Object.keys(data));
 
         let images = [];
 
-        // Preview image
+        // Main product cover image
         if (data.preview_url) images.push(data.preview_url);
 
-        // Gallery
-        if (Array.isArray(data.preview_urls)) {
-            images.push(...data.preview_urls);
+        // Gallery images
+        if (Array.isArray(data.content_preview_files)) {
+            images.push(
+                ...data.content_preview_files
+                    .map(f => f.preview_url || f.large_url || f.url)
+                    .filter(Boolean)
+            );
         }
 
-        // Marketing images
+        // Marketing images (sometimes included)
         if (Array.isArray(data.marketing_images)) {
             images.push(
                 ...data.marketing_images
