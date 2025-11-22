@@ -21,11 +21,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # ⭐ FFmpeg is required for video generation
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
       - name: Run the bot
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GUMROAD_API_KEY: ${{ secrets.GUMROAD_API_KEY }}
-          GUMROAD_PRODUCT_URLS: ${{ secrets.GUMROAD_PRODUCT_URLS }}   # ✅ FIXED – added!
-          PINTEREST_TOKEN: ${{ secrets.PINTEREST_TOKEN }}
+          GUMROAD_PRODUCT_URLS: ${{ secrets.GUMROAD_PRODUCT_URLS }}
+          
+          # ⭐ Correct Pinterest secrets
+          PINTEREST_EMAIL: ${{ secrets.PINTEREST_EMAIL }}
+          PINTEREST_PASSWORD: ${{ secrets.PINTEREST_PASSWORD }}
+          PINTEREST_BOARD_URL: ${{ secrets.PINTEREST_BOARD_URL }}
+
+          # ⭐ TikTok cookie login
           TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}
+
         run: node index.js
