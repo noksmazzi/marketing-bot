@@ -5,7 +5,7 @@ async function fetchNewImages(productUrl) {
     try {
         console.log("🔍 Raw productUrl received:", productUrl);
 
-        // 1. FIX: Convert array → string if needed
+        // Convert array → string if needed
         if (Array.isArray(productUrl)) {
             productUrl = productUrl[0];
         }
@@ -17,20 +17,19 @@ async function fetchNewImages(productUrl) {
         // Remove tracking params
         const cleanUrl = productUrl.split("?")[0];
 
-        // Convert full URL → Gumroad internal product path
+        // Extract product slug (ID) from Gumroad URL
         // Example:
-        // https://thewandacreates.gumroad.com/l/ofawui
-        // becomes:
-        // thewandacreates.gumroad.com/l/ofawui
-        const productPath = cleanUrl
-            .replace("https://", "")
-            .replace("http://", "");
+        // https://thewandacreates.gumroad.com/l/ofawui → "ofawui"
+        const slugMatch = cleanUrl.match(/\/l\/([^\/\?]+)/);
+        if (!slugMatch) {
+            throw new Error("Could not extract product slug from URL");
+        }
 
-        console.log("🔗 Product API Path:", productPath);
+        const productId = slugMatch[1];
+        console.log("🔗 Product ID:", productId);
 
-        // Hidden Gumroad JSON API endpoint
-        const apiUrl = `https://gumroad.com/discover/api/products/${productPath}`;
-
+        // Correct API URL
+        const apiUrl = `https://gumroad.com/discover/api/products/${productId}`;
         console.log("📡 Fetching Gumroad API:", apiUrl);
 
         const res = await fetch(apiUrl, {
@@ -45,21 +44,19 @@ async function fetchNewImages(productUrl) {
         }
 
         const data = await res.json();
-
         console.log("📦 Gumroad API response keys:", Object.keys(data));
 
-        // Extract all possible images from API
         let images = [];
 
-        // Preview
+        // Preview image
         if (data.preview_url) images.push(data.preview_url);
 
-        // Gallery images
+        // Gallery
         if (Array.isArray(data.preview_urls)) {
             images.push(...data.preview_urls);
         }
 
-        // Marketing images (cover + gallery)
+        // Marketing images
         if (Array.isArray(data.marketing_images)) {
             images.push(
                 ...data.marketing_images
