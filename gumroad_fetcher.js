@@ -1,39 +1,30 @@
 const fetch = require("node-fetch");
 
-// Main function to fetch NEW images from a Gumroad product
 async function fetchNewImages(productUrl) {
     try {
         console.log("🔍 Raw productUrl received:", productUrl);
 
-        // Convert array → string if needed
-        if (Array.isArray(productUrl)) {
-            productUrl = productUrl[0];
-        }
+        if (Array.isArray(productUrl)) productUrl = productUrl[0];
 
         if (!productUrl || typeof productUrl !== "string") {
-            throw new Error("Invalid productUrl (not a string)");
+            throw new Error("Invalid productUrl");
         }
 
-        // Remove tracking params
-        const cleanUrl = productUrl.split("?")[0];
-
-        // Extract product slug (ID)
-        const slugMatch = cleanUrl.match(/\/l\/([^\/\?]+)/);
-        if (!slugMatch) {
-            throw new Error("Could not extract product slug from URL");
-        }
+        // Extract product slug
+        const slugMatch = productUrl.match(/\/l\/([^\/\?]+)/);
+        if (!slugMatch) throw new Error("Could not extract product slug from URL");
 
         const productId = slugMatch[1];
         console.log("🔗 Product ID:", productId);
 
-        // NEW WORKING GUMROAD ENDPOINT
-        // Works for ALL products, even unlisted ones
-        const apiUrl = `${cleanUrl}?format=json`;
-        console.log("📡 Fetching Gumroad JSON:", apiUrl);
+        // Official Gumroad API
+        const apiUrl = `https://api.gumroad.com/v2/products/${productId}`;
+
+        console.log("📡 Fetching Gumroad API:", apiUrl);
 
         const res = await fetch(apiUrl, {
             headers: {
-                "User-Agent": "Mozilla/5.0",
+                "Authorization": `Bearer ${process.env.GUMROAD_API_KEY}`,
                 "Accept": "application/json"
             }
         });
@@ -43,35 +34,26 @@ async function fetchNewImages(productUrl) {
         }
 
         const data = await res.json();
-        console.log("📦 Gumroad product keys:", Object.keys(data));
+        console.log("📦 Gumroad API keys:", Object.keys(data));
 
         let images = [];
 
-        // Main product cover image
-        if (data.preview_url) images.push(data.preview_url);
+        // Gumroad API returns product object inside "product"
+        const p = data.product;
 
-        // Gallery images
-        if (Array.isArray(data.content_preview_files)) {
-            images.push(
-                ...data.content_preview_files
-                    .map(f => f.preview_url || f.large_url || f.url)
-                    .filter(Boolean)
-            );
-        }
+        if (p.preview_url) images.push(p.preview_url);
 
-        // Marketing images (sometimes included)
-        if (Array.isArray(data.marketing_images)) {
+        if (Array.isArray(p.previews)) {
             images.push(
-                ...data.marketing_images
+                ...p.previews
                     .map(img => img.large_url || img.url)
                     .filter(Boolean)
             );
         }
 
-        // Remove duplicates
         images = [...new Set(images)];
 
-        console.log(`📸 Extracted ${images.length} images from Gumroad`);
+        console.log(`📸 Extracted ${images.length} images`);
         return images;
 
     } catch (err) {
