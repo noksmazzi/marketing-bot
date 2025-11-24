@@ -31,6 +31,7 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      # ⭐ Run the bot
       - name: Run the bot
         env:
           GUMROAD_PRODUCT_URLS: ${{ secrets.GUMROAD_PRODUCT_URLS }}
@@ -39,6 +40,7 @@ jobs:
           PINTEREST_PASSWORD: ${{ secrets.PINTEREST_PASSWORD }}
           PINTEREST_BOARD_URL: ${{ secrets.PINTEREST_BOARD_URL }}
 
-          TIKTOK_COOKIE: ${{ secrets.TIKTOK_COOKIE }}
+          # ⭐ Correct TikTok secret name (JSON array of cookies)
+          TIKTOK_COOKIES: ${{ secrets.TIKTOK_COOKIES }}
 
         run: node index.js
