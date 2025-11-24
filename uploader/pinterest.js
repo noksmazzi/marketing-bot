@@ -1,4 +1,4 @@
-// uploader/pinterest.js (2025 UPDATED)
+// uploader/pinterest.js (2025 UPDATED FULL VERSION)
 const { chromium } = require("playwright");
 const path = require("path");
 
@@ -31,26 +31,83 @@ async function uploadToPinterest({
 
   try {
     //----------------------------------------------------
-    // 1️⃣ LOGIN
+    // 1️⃣ LOGIN (2025 UNIVERSAL LOGIN)
     //----------------------------------------------------
     console.log("Opening Pinterest login...");
     await page.goto("https://www.pinterest.com/login/", {
-      waitUntil: "networkidle"
+      waitUntil: "load",
+      timeout: 60000
     });
 
-    console.log("Filling login form...");
-    await page.fill('input[name="id"]', username);
-    await page.fill('input[name="password"]', password);
-    await page.click('button[data-test-id="registerFormSubmitButton"]');
+    await page.setViewportSize({ width: 1366, height: 900 });
 
-    await page.waitForTimeout(6000);
+    console.log("Waiting for login fields...");
+
+    const emailSelectors = [
+      'input[name="id"]',
+      'input[type="email"]',
+      'input[aria-label="Email"]'
+    ];
+
+    const passwordSelectors = [
+      'input[name="password"]',
+      'input[type="password"]',
+      'input[aria-label="Password"]'
+    ];
+
+    const loginButtonSelectors = [
+      'button[data-test-id="registerFormSubmitButton"]',
+      'button[data-test-id="loginButton"]',
+      'button[type="submit"]',
+      'button:has-text("Log in")',
+      'button:has-text("Log In")'
+    ];
+
+    let emailFound = false;
+    for (const sel of emailSelectors) {
+      try {
+        await page.fill(sel, username);
+        emailFound = true;
+        break;
+      } catch {}
+    }
+    if (!emailFound) throw new Error("Pinterest email input not found.");
+
+    let pwFound = false;
+    for (const sel of passwordSelectors) {
+      try {
+        await page.fill(sel, password);
+        pwFound = true;
+        break;
+      } catch {}
+    }
+    if (!pwFound) throw new Error("Pinterest password input not found.");
+
+    console.log("Clicking login button...");
+
+    let loginClicked = false;
+    for (const sel of loginButtonSelectors) {
+      try {
+        await page.click(sel, { timeout: 30000 });
+        loginClicked = true;
+        break;
+      } catch {}
+    }
+
+    if (!loginClicked) {
+      throw new Error("Pinterest login button not found.");
+    }
+
+    await page.waitForTimeout(8000);
+    console.log("Login submitted.");
 
     //----------------------------------------------------
     // 2️⃣ OPEN CREATE PIN PAGE
     //----------------------------------------------------
     console.log("Opening Create Pin...");
     await page.goto("https://www.pinterest.com/pin-builder/", {
-      waitUntil: "networkidle"
+      waitUntil: "networkidle",
+      timeout: 60000
     });
 
     await page.waitForTimeout(4000);
@@ -60,7 +117,6 @@ async function uploadToPinterest({
     //----------------------------------------------------
     console.log("Uploading image...");
 
-    // Works with 2025 DOM
     const uploadSelectors = [
       'input[type="file"]',
       'input[data-test-id="media-upload-input"]'
@@ -73,7 +129,8 @@ async function uploadToPinterest({
       if (fileInput) break;
     }
 
-    if (!fileInput) throw new Error("Pinterest image upload field not found.");
+    if (!fileInput)
+      throw new Error("Pinterest image upload field not found.");
 
     await fileInput.setInputFiles(path.resolve(imagePath));
     await page.waitForTimeout(5000);
@@ -117,10 +174,9 @@ async function uploadToPinterest({
     //----------------------------------------------------
     console.log("Selecting board...");
 
-    // Board name from URL
     const boardName = boardUrl.split("/").filter(Boolean).pop();
 
-    // Open dropdown
+    // Open board dropdown
     await page.click('[data-test-id="board-dropdown-select-button"]');
     await page.waitForTimeout(2000);
 
@@ -130,6 +186,7 @@ async function uploadToPinterest({
     ];
 
     let boardClicked = false;
+
     for (const sel of boardSelectors) {
       try {
         await page.click(sel);
@@ -139,13 +196,15 @@ async function uploadToPinterest({
     }
 
     if (!boardClicked) {
-      console.log("⚠️ Board not auto-selected. Pinterest UI changed?");
+      console.log(
+        "⚠️ Board not auto-selected. Pinterest UI might be running a new variant."
+      );
     }
 
     await page.waitForTimeout(2000);
 
     //----------------------------------------------------
-    // 7️⃣ PUBLISH PIN
+    // 7️⃣ PUBLISH THE PIN
     //----------------------------------------------------
     console.log("Publishing pin...");
 
@@ -156,6 +215,7 @@ async function uploadToPinterest({
     ];
 
     let published = false;
+
     for (const sel of publishSelectors) {
       try {
         await page.click(sel);
@@ -173,7 +233,7 @@ async function uploadToPinterest({
     await page.waitForTimeout(6000);
 
     //----------------------------------------------------
-    // 8️⃣ CHECK SUCCESS
+    // 8️⃣ CHECK PUBLISH SUCCESS
     //----------------------------------------------------
     const urlAfter = page.url();
     if (!urlAfter.includes("pin/create") && !urlAfter.includes("pin-builder")) {
@@ -182,10 +242,11 @@ async function uploadToPinterest({
       return true;
     }
 
-    console.log("⚠️ Pinterest did not redirect, but pin may still be posted.");
+    console.log(
+      "⚠️ Pinterest did not redirect, but the pin may still have been posted."
+    );
     await browser.close();
     return true;
-
   } catch (err) {
     console.log("Pinterest upload error:", err.message);
     await browser.close();
